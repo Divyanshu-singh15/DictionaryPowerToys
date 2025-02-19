@@ -1,0 +1,13 @@
+{
+    "ID": "DI953C974C2241878F282EA18A7769E4",
+    "ActionKeyword": "`",
+    "Name": "Dictionary",
+    "Description": "Look up word definitions and synonyms",
+    "Author": "Divyanshu Singh",
+    "Version": "1.0.0",
+    "Language": "csharp",
+    "Website": "https://github.com/Divyanshu-singh15",
+    "ExecuteFileName": "Community.PowerToys.Run.Plugin.Dictionary.dll",
+    "IcoPathDark": "Images\\dictionary.dark.png",
+    "IcoPathLight": "Images\\dictionary.light.png"
+}

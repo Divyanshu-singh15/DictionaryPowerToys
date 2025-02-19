@@ -1,0 +1,55 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net8.0-windows</TargetFramework>
+		<Platforms>x64;ARM64</Platforms>
+		<PlatformTarget>$(Platform)</PlatformTarget>
+		<UseWPF>true</UseWPF>
+		<LangVersion>preview</LangVersion>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+		<AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+		<GenerateDependencyFile>true</GenerateDependencyFile>
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+		<NoWarn>CS1701;CS1702;CS1705</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.2" />
+		<PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.7" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Reference Include="PowerToys.Common.UI">
+			<HintPath>PowerToys.Common.UI.dll</HintPath>
+		</Reference>
+		<Reference Include="PowerToys.ManagedCommon">
+			<HintPath>PowerToys.ManagedCommon.dll</HintPath>
+		</Reference>
+		<Reference Include="PowerToys.Settings.UI.Lib">
+			<HintPath>PowerToys.Settings.UI.Lib.dll</HintPath>
+		</Reference>
+		<Reference Include="Wox.Infrastructure">
+			<HintPath>Wox.Infrastructure.dll</HintPath>
+		</Reference>
+		<Reference Include="Wox.Plugin">
+			<HintPath>Wox.Plugin.dll</HintPath>
+		</Reference>
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="plugin.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Include="Dictionary.db">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Include="Images\**\*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+	<Target Name="CopyNativeLibraries" AfterTargets="Build">
+		<Copy SourceFiles="@(NativeLibraries)" DestinationFolder="$(TargetDir)" />
+	</Target>
+</Project>
