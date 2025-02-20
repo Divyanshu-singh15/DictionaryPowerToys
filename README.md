@@ -9,6 +9,7 @@
 - [Installation](#installation)
 - [Compiling the Plugin](#compiling-the-plugin)
 - [Usage](#usage)
+- [Acknowledgments](#Acknowledgments)
 - [Contributing](#contributing)
 - [License](#license)
 
