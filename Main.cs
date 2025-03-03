@@ -1,4 +1,4 @@
-﻿using System.Net.NetworkInformation;
+using System.Net.NetworkInformation;
 using System.Windows.Controls;
 using ManagedCommon;
 using Microsoft.Data.Sqlite;
@@ -6,6 +6,7 @@ using Microsoft.PowerToys.Settings.UI.Library;
 using Wox.Plugin;
 using Wox.Plugin.Logger;
 using System.IO;
+using System.Diagnostics;
 
 namespace Community.PowerToys.Run.Plugin.Dictionary
 {
@@ -91,23 +92,23 @@ namespace Community.PowerToys.Run.Plugin.Dictionary
             if (!_isDatabaseInitialized)
             {
                 return [new Result
-        {
-            Title = "Dictionary Plugin Error",
-            SubTitle = "Database not properly initialized. Check logs for details.",
-            IcoPath = IconPath,
-            Score = 100
-        }];
+                {
+                    Title = "Dictionary Plugin Error",
+                    SubTitle = "Database not properly initialized. Check logs for details.",
+                    IcoPath = IconPath,
+                    Score = 100
+                }];
             }
 
             if (string.IsNullOrWhiteSpace(query.Search))
             {
                 return [new Result
-        {
-            Title = "Dictionary Plugin",
-            SubTitle = "Type a word to search for its definition",
-            IcoPath = IconPath,
-            Score = 100
-        }];
+                {
+                    Title = "Dictionary Plugin",
+                    SubTitle = "Type a word to search for its definition",
+                    IcoPath = IconPath,
+                    Score = 100
+                }];
             }
 
             Log.Info($"Dictionary Plugin: Searching for word '{query.Search}'", GetType());
@@ -122,9 +123,9 @@ namespace Community.PowerToys.Run.Plugin.Dictionary
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText = @"
-            SELECT m.rowid as wordId, m.word, m.definition, m.example, m.speech_part
-            FROM meanings m
-            WHERE m.word = @query";
+                    SELECT m.rowid as wordId, m.word, m.definition, m.example, m.speech_part
+                    FROM meanings m
+                    WHERE m.word = @query";
 
                     command.Parameters.AddWithValue("@query", query.Search.ToLowerInvariant());
 
@@ -141,10 +142,10 @@ namespace Community.PowerToys.Run.Plugin.Dictionary
                         using (var synonymsCmd = connection.CreateCommand())
                         {
                             synonymsCmd.CommandText = @"
-                    SELECT synonym 
-                    FROM synonyms 
-                    WHERE word = @word 
-                    LIMIT 5";
+                            SELECT synonym 
+                            FROM synonyms 
+                            WHERE word = @word 
+                            LIMIT 5";
                             synonymsCmd.Parameters.AddWithValue("@word", word);
 
                             using var synonymsReader = synonymsCmd.ExecuteReader();
@@ -166,9 +167,10 @@ namespace Community.PowerToys.Run.Plugin.Dictionary
                             SubTitle = subtitle,
                             IcoPath = IconPath,
                             Score = 100,
-                            ContextData = new DictionaryResult(definition, example, speechPart, synonyms),
+                            ContextData = new DictionaryResult(word, definition, example, speechPart, synonyms),
                             ToolTipData = new ToolTipData(word,
-                                $"Definition: {definition}\nExample: {example}\nPart of Speech: {speechPart}")
+                                $"Definition: {definition}\nExample: {example}\nPart of Speech: {speechPart}"),
+                            Action = _ => OpenWordInBrowser(word)
                         });
                     }
                 }
@@ -178,13 +180,6 @@ namespace Community.PowerToys.Run.Plugin.Dictionary
                 if (results.Count == 0)
                 {
                     string searchTerm = query.Search.ToLowerInvariant().Trim();
-
-                    // If the user typed "dict <something>", remove "dict"
-                    //const string activationWord = "dict ";
-                    //if (searchTerm.StartsWith(activationWord))
-                    //{
-                    //    searchTerm = searchTerm.Substring(activationWord.Length).Trim();
-                    //}
 
                     using var fuzzyCommand = connection.CreateCommand();
                     // Query FTS table directly, no JOIN
@@ -233,38 +228,44 @@ namespace Community.PowerToys.Run.Plugin.Dictionary
                             SubTitle = subtitle,
                             IcoPath = IconPath,
                             Score = 80, // Fuzzy matches get a lower score
-                            ContextData = new DictionaryResult(definition, "", "", synonyms), // Note: example and speech_part are empty
+                            ContextData = new DictionaryResult(word, definition, "", "", synonyms), // Note: example and speech_part are empty
                             ToolTipData = new ToolTipData(
                                 word,
-                                $"Definition: {definition}")
+                                $"Definition: {definition}"),
+                            Action = _ => OpenWordInBrowser(word)
                         });
                     }
                 }
 
-
-
                 // If no results found, show a message
-
                 if (results.Count == 0)
                 {
+                    string searchWord = query.Search.Trim();
                     results.Add(new Result
                     {
-                        Title = $"No definition found for '{query.Search}'",
+                        Title = $"No definition found for '{searchWord}'",
                         SubTitle = "Try a different word or check your spelling",
                         IcoPath = IconPath,
-                        Score = 100
+                        Score = 100,
+                        // Store the search word to use in context menu
+                        ContextData = new DictionaryResult(searchWord, "", "", "", []),
+                        Action = _ => OpenWordInBrowser(searchWord)
                     });
                 }
             }
             catch (Exception ex)
             {
                 Log.Error($"Dictionary Plugin: Query failed - {ex.Message}", GetType());
+                string searchWord = query.Search.Trim();
                 results.Add(new Result
                 {
                     Title = "Error searching dictionary",
                     SubTitle = $"Error: {ex.Message}",
                     IcoPath = IconPath,
-                    Score = 100
+                    Score = 100,
+                    // Store the search word to use in context menu even for error results
+                    ContextData = new DictionaryResult(searchWord, "", "", "", []),
+                    Action = _ => OpenWordInBrowser(searchWord)
                 });
             }
 
@@ -274,21 +275,38 @@ namespace Community.PowerToys.Run.Plugin.Dictionary
 
         public List<ContextMenuResult> LoadContextMenus(Result selectedResult)
         {
+            // Extract the word from ContextData or create empty menu
             if (selectedResult?.ContextData is not DictionaryResult result)
             {
                 return [];
             }
 
-            return [
-                new ContextMenuResult
+            var contextMenuResults = new List<ContextMenuResult>();
+
+            // Add "Search on Web" option for all results
+            contextMenuResults.Add(new ContextMenuResult
+            {
+                PluginName = Name,
+                Title = "Search on Web",
+                FontFamily = "Segoe Fluent Icons,Segoe MDL2 Assets",
+                Glyph = "\xE774",  // Globe icon
+                Action = _ => OpenWordInBrowser(result.Word)
+            });
+
+            // Only add "Copy Definition" if there's a definition to copy
+            if (!string.IsNullOrWhiteSpace(result.Definition))
+            {
+                contextMenuResults.Add(new ContextMenuResult
                 {
                     PluginName = Name,
                     Title = "Copy Definition",
                     FontFamily = "Segoe Fluent Icons,Segoe MDL2 Assets",
-                    Glyph = "\xE8C8",
+                    Glyph = "\xE8C8",  // Copy icon
                     Action = _ => CopyToClipboard(result.Definition)
-                }
-            ];
+                });
+            }
+
+            return contextMenuResults;
         }
 
         public Control CreateSettingPanel()
@@ -343,6 +361,34 @@ namespace Community.PowerToys.Run.Plugin.Dictionary
             }
         }
 
+        private static bool OpenWordInBrowser(string word)
+        {
+            if (string.IsNullOrEmpty(word))
+            {
+                return false;
+            }
+
+            try
+            {
+                string url = $"https://www.dictionary.com/browse/{Uri.EscapeDataString(word.Trim())}";
+                Log.Info($"Dictionary Plugin: Opening URL in browser - {url}", typeof(Main));
+
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                };
+
+                Process.Start(psi);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Dictionary Plugin: Failed to open browser - {ex.Message}", typeof(Main));
+                return false;
+            }
+        }
+
         public void Dispose()
         {
             Log.Info("Dictionary Plugin: Disposing", GetType());
@@ -366,5 +412,5 @@ namespace Community.PowerToys.Run.Plugin.Dictionary
         }
     }
 
-    public record DictionaryResult(string Definition, string Example, string SpeechPart, List<string> Synonyms);
+    public record DictionaryResult(string Word, string Definition, string Example, string SpeechPart, List<string> Synonyms);
 }
