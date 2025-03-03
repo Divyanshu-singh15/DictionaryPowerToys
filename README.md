@@ -41,6 +41,7 @@ Once installed, use PowerToys Run (Alt + Space) and type your query prefixed wit
 ## Acknowledgments
 
 A big thank you to the creators and contributors of the [Wordset Dictionary](https://github.com/wordset/wordset-dictionary) for providing the dictionary data used in this plugin. Your work is greatly appreciated!
+Additionally, a special thanks to [Dictionary.com](https://www.dictionary.com/) for serving as the online search provider, helping users find definitions when offline results aren't enough.
 
 ## Contributing
 
